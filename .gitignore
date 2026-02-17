@@ -1,0 +1,6 @@
+.env
+venv
+transcriptions-test
+logs
+./idea
+*.db

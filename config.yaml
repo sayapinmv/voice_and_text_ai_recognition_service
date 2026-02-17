@@ -1,0 +1,55 @@
+#transcriptions:
+##      Related path from project root dir
+#  dir_path: "./transcriptions"
+#  speech_to_text:
+##      Related path from project 'transcriptions' dir
+#    dir_path: "./speach_to_text"
+#    neuro_nets:
+#      whisper_ai:
+#        settings:
+#
+#  text_to_speech:
+#    dir_path: "./text_to_speech"
+#    neuro_nets:
+
+server:
+  host: localhost
+  port: 10000
+
+logging:
+  std_logger:
+    version: 1
+    disable_existing_loggers: False
+
+    formatters:
+      structured:
+        (): src.module.logger.std_logging.formatter.StructuredFormatter
+        datefmt: "%Y-%m-%d %H:%M:%S"
+      colored:
+        (): src.module.logger.std_logging.formatter.ColoredFormatter
+        format: '%(asctime)s - %(name)s - [%(levelname)s] - %(message)s'
+        datefmt: "%Y-%m-%d %H:%M:%S"
+      json:
+        format: '{"time": "%(asctime)s", "name": "%(name)s", "level": "%(levelname)s", "message": "%(message)s"}'
+        datefmt: "%Y-%m-%d %H:%M:%S"
+
+    handlers:
+      file:
+        class: logging.handlers.RotatingFileHandler
+        level: DEBUG
+        formatter: json
+        # Path must be valid. Log file will create
+        filename: C:/Users/sayap/PycharmProjects/speech-to-text/logs/app.log
+        maxBytes: 5120
+        backupCount: 5
+        encoding: utf8
+      stdout:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: colored
+        stream: ext://sys.stdout
+
+    loggers:
+      root:
+        level: DEBUG
+        handlers: [file, stdout]
