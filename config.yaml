@@ -1,20 +1,42 @@
-#transcriptions:
-##      Related path from project root dir
-#  dir_path: "./transcriptions"
-#  speech_to_text:
-##      Related path from project 'transcriptions' dir
-#    dir_path: "./speach_to_text"
-#    neuro_nets:
-#      whisper_ai:
-#        settings:
-#
+ai_models:
+  speech_to_text:
+    transcriptions_dirpath: ./outputs/speech_to_text
+    origins_dirpath: ./inputs/media
+    model_settings:
+      name: base
+      device: 'cpu'
+      in_memory: true
+      language: 'ru'  # string: "ru", "en", "fr" и т.д. или null для автоопределения
+      task: "transcribe"  # string: "transcribe" или "translate"
+
+      # Параметры семплинга
+      temperature: 0.0  # float или список
+
+      # Пороговые значения для отбраковки
+      compression_ratio_threshold: 2.4  # float или null
+      logprob_threshold: -1.0  # float или null
+      no_speech_threshold: 0.6  # float или null
+
+      # Дополнительные параметры
+      condition_on_previous_text: true  # boolean
+      initial_prompt: null  # string или null
+      word_timestamps: false  # boolean
+      verbose: false  # boolean
+      fp16: true  # boolean
+
 #  text_to_speech:
-#    dir_path: "./text_to_speech"
-#    neuro_nets:
+#    model_name:
 
 server:
   host: localhost
-  port: 10000
+  port: 80
+
+pg_perovskite_dev:
+  db_name: ${PG_PEROVSKITE_DEV_DB_NAME}
+  user: ${PG_PEROVSKITE_DEV_USER}
+  password: ${PG_PEROVSKITE_DEV_PASSWORD}
+  host: localhost
+  port: 5432
 
 logging:
   std_logger:
@@ -39,7 +61,7 @@ logging:
         level: DEBUG
         formatter: json
         # Path must be valid. Log file will create
-        filename: C:/Users/sayap/PycharmProjects/speech-to-text/logs/app.log
+        filename: ./logs/app.log
         maxBytes: 5120
         backupCount: 5
         encoding: utf8

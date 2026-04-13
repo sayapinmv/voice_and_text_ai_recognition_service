@@ -1,8 +1,9 @@
-from src.module.logger.std_logging.filter import ContextFilter
-from src.module.logger.logger import Logger
 from logging import config
 import sys
 import logging
+
+from src.module.logger.std_logging.filter import ContextFilter
+from src.module.logger.logger import Logger
 
 
 class StdLogger(Logger):

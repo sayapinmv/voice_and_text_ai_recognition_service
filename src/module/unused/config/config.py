@@ -1,6 +1,5 @@
-from src.unused.config.providers import ConfigProvider, EnvProvider
-from src.unused.config.settings import FieldSetting
-from abc import ABC, abstractmethod
+from src.module.unused.config.providers import ConfigProvider, EnvProvider
+from src.module.unused.config.settings import FieldSetting
 
 
 class Config:

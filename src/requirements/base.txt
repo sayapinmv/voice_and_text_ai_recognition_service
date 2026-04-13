@@ -1,8 +1,0 @@
-pyyaml
-dotenv
-psycopg2
-whisper
-pydantic
-sqlalchemy
-fastapi
-uvicorn[standard]

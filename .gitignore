@@ -4,3 +4,4 @@ transcriptions-test
 logs
 ./idea
 *.db
+unused

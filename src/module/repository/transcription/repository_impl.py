@@ -1,8 +1,11 @@
+from sqlalchemy import select
+
 from src.module.repository.transcription.repository import TranscriptionRepository, TranscriptionType
 from src.module.entity.transcription_entity import TranscriptionEntity
-from src.module.database.postgres.db import PostgresDB
+from src.module.database.orm.postgres.db import PostgresDB
 from src.module.logger.logger import Logger
-from sqlalchemy import select
+from src.module.database.orm.postgres.models.transcription_model import TranscriptionModel
+from src.module.repository.transcription.mapper import to_transcription_model, to_transcription_entity
 
 
 class TranscriptionRepositoryImpl(TranscriptionRepository):
@@ -13,44 +16,59 @@ class TranscriptionRepositoryImpl(TranscriptionRepository):
 
     def get_by_id(self, id: int) -> TranscriptionEntity:
         with self._db.get_session() as session:
-            statement = select(TranscriptionEntity).where(TranscriptionEntity.id == id)
-            entity = session.scalars(statement).first()
-            return entity
+            statement = select(TranscriptionModel).where(TranscriptionModel.id == id)
+            model = session.scalars(statement).first()
+            return to_transcription_entity(model)
 
-    def get_by_name_and_type(self, name: str, transcription_type: TranscriptionType):
-        with (self._db.get_session() as session):
-            statement = select(TranscriptionEntity).where(TranscriptionEntity.name == name, TranscriptionEntity.type == transcription_type.name)
-            entity = session.scalars(statement).first()
-            return entity
+    def get_by_name_and_type(self, transcription_name: str, transcription_type: TranscriptionType):
+        with self._db.get_session() as session:
+            statement = select(TranscriptionModel).where(
+                TranscriptionModel.transcription_name == transcription_name,
+                TranscriptionModel.transcription_type == transcription_type.value
+            )
 
-    def create(self, entity: TranscriptionEntity):
+            model = session.scalars(statement).first()
+            if model is None:
+                return model
+            return to_transcription_entity(model)
+
+    def create(self, entity: TranscriptionEntity) -> TranscriptionEntity:
+        model = to_transcription_model(entity)
         with self._db.get_session() as session:
             try:
-                session.add(entity)
+                session.add(model)
                 session.commit()
-            except Exception:
+                return to_transcription_entity(model)
+            except Exception as exc:
                 session.rollback()
+                raise exc
             finally:
                 session.close()
 
-    def update(self, entity: TranscriptionEntity):
+    def update(self, entity: TranscriptionEntity) -> TranscriptionEntity:
+        model = to_transcription_model(entity)
         with self._db.get_session() as session:
             try:
-                session.merge(entity)
+                session.merge(model)
                 session.commit()
-            except Exception:
+                return to_transcription_entity(model)
+            except Exception as exc:
                 session.rollback()
+                raise exc
             finally:
                 session.close()
 
     def remove_by_id(self, id: int):
-        entity = self.get_by_id(id)
-
         with self._db.get_session() as session:
             try:
-                session.delete(entity)
+                result = session.query(TranscriptionModel).filter(TranscriptionModel.id == id).delete()
                 session.commit()
-            except Exception:
+
+                if result == 0:
+                    raise ValueError(f"Entity with id {id} not found")
+
+            except Exception as exc:
                 session.rollback()
+                raise exc
             finally:
                 session.close()

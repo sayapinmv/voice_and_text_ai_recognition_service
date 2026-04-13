@@ -1,58 +1,52 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict, YamlConfigSettingsSource
 from pydantic import SecretStr, Field, BaseModel
-from typing import Literal
-from pathlib import Path
-
-ROOT_DIR = Path(__file__).parent.parent.parent.parent.absolute()
-ENV_FILE_PATH = ROOT_DIR / ".env"
-YAML_FILE_PATH = ROOT_DIR / "config.yaml"
-ENV_FILE_ENCODING = "utf-8"
-YAML_FILE_ENCODING = "utf-8"
+from pydantic_settings import SettingsConfigDict
+from typing import Literal, Any
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=ENV_FILE_PATH,
-        env_file_encoding=ENV_FILE_ENCODING,
-        case_sensitive=False,
-    )
+class BaseAIModel(BaseModel):
+    transcriptions_dirpath: str
+    origins_dirpath: str
+    model_settings: dict[str, Any]
 
 
-class PerovskitePostgresDev(Settings):
-    model_config = SettingsConfigDict(env_prefix='PG_PEROVSKITE_DEV_')
+class TextToSpeechAIModel(BaseAIModel):
+    pass
 
-    db_name: SecretStr
-    user: SecretStr
-    password: SecretStr
-    host: SecretStr = "127.0.0.1"
-    port: int = Field(5432, gt=0)
+
+class SpeechToTextAIModel(BaseAIModel):
+    pass
+
+
+class AIModels(BaseModel):
+    speech_to_text: SpeechToTextAIModel = None
+    text_to_speech: TextToSpeechAIModel = None
 
 
 class ServerConfig(BaseModel):
     host: str = "localhost"
-    port: int = Field(5432, gt=0)
-    mode: Literal[
-        'DEV',
-        'PROD'
-    ] = Field('DEV')
+    port: int = Field(8080, gt=0, le=65535)
+    mode: Literal['DEV', 'PROD'] = Field('DEV')
+
+
+class PerovskitePostgresDev(BaseModel):
+    db_name: SecretStr
+    user: SecretStr
+    password: SecretStr
+    host: str = "127.0.0.1"
+    port: int = Field(5432, gt=0, le=65535)
+
+    @property
+    def connection_string(self) -> str:
+        return (f"postgresql+psycopg2://{self.user.get_secret_value()}:{self.password.get_secret_value()}@"
+                f"{self.host}:{self.port}/{self.db_name.get_secret_value()}")
 
 
 class LoggingConfig(BaseModel):
     std_logger: dict = None
 
 
-class Config(BaseSettings):
-    model_config = SettingsConfigDict(yaml_file=YAML_FILE_PATH,
-                                      yaml_file_encoding=YAML_FILE_ENCODING)
-
-    perovskite_pg_dev: PerovskitePostgresDev = Field(default_factory=PerovskitePostgresDev)
-    server: ServerConfig
-    logging: LoggingConfig
-
-    @classmethod
-    def settings_customise_sources(cls, settings_cls, **kwargs):
-        return (YamlConfigSettingsSource(settings_cls),)
-
-    @classmethod
-    def load(cls) -> "Config":
-        return cls()
+class AppConfig(BaseModel):
+    ai_models: AIModels = None
+    server: ServerConfig = None
+    pg_perovskite_dev: PerovskitePostgresDev = None
+    logging: LoggingConfig = None

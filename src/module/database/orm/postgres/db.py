@@ -1,5 +1,5 @@
-from src.module.database.postgres.base_model import BaseSqliteModel
-from sqlalchemy.orm.session import sessionmaker, Session
+from src.module.database.orm.postgres.models.base_model import BasePostgresModel
+from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy import create_engine
 
 
@@ -30,7 +30,7 @@ class PostgresDB:
         return self._session_factory
 
     def create_tables(self):
-        BaseSqliteModel.metadata.create_all(bind=self.engine)
+        BasePostgresModel.metadata.create_all(bind=self.engine)
 
     def get_session(self):
         return self.session_factory()

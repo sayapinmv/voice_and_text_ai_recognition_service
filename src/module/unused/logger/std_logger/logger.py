@@ -60,7 +60,7 @@ DEFAULT_LOG_FILE_TEMPLATE = 'log_{uuid}.log'
 FORMAT_LITERAL = '{'
 
 FORMATTERS = {
-    "text": {
+    "speech_to_text": {
         "format":  "{asctime}  {name} [{levelname}] {message}",
         "datefmt": "%Y-%m-%d %H:%M:%S",
     },
