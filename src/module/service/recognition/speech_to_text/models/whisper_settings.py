@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class WhisperSettings(BaseModel):
-    name: Optional[str] = Field(
+    model_name: Optional[str] = Field(
         default='base',
         description="Версия нейросетевой модели whisper (tiny, small, base, medium, large-v2, large-v3)"
     )
@@ -63,7 +63,7 @@ class WhisperSettings(BaseModel):
         description="Использовать FP16 (только для GPU)"
     )
 
-    @field_validator('name')
+    @field_validator('model_name')
     def validate_name(cls, v):
         allowed = ['tiny', 'small', 'base', 'medium', 'large-v2', 'large-v3']
         if v not in allowed:

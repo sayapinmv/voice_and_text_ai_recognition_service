@@ -59,7 +59,7 @@ class TranscriptionsController:
     async def _create(self,
                       transcription_type: str = Form(str),
                       model_settings: Optional[str] = Form('{}'),
-                      origin_file: UploadFile = File(None)):
+                      file: UploadFile = File(None)):
 
         try:
             trans_type = TranscriptionType(transcription_type)
@@ -77,9 +77,9 @@ class TranscriptionsController:
 
         transcription_dto = TranscriptionDto(
             model_settings=json_model_settings,
-            filename=str(origin_file.filename),
+            filename=str(file.filename),
             transcription_type=trans_type,
-            file_stream=origin_file.file
+            file_stream=file.file
         )
 
         try:

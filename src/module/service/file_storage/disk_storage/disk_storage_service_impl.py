@@ -27,15 +27,25 @@ class DiskFileStorageServiceImpl(DiskFileStorageService):
         with open(filepath, 'w', buffering=self.buffer_size, encoding=encoding.value) as file:
             seek = self.buffer_size
             while chunk := content_stream.read(seek):
-                file.write(chunk)
+                if not isinstance(chunk, str):
+                    raw_bytes = content_stream.read()
+                    text = raw_bytes.decode('utf-8')
+                else:
+                    text = chunk
+
+                file.write(text)
                 seek += self.buffer_size
 
         return filepath
 
     def create_sound_file(self, filename: str, audio_array: np.ndarray, sample_rate: int) -> Path:
+        extension = filename.split(".")[-1]
         filepath = self.get_unique_filepath(filename)
-        sf.write(filepath, audio_array, sample_rate)
 
+        if audio_array.dtype != np.float32:
+            audio_array = audio_array.astype(np.float32)
+
+        sf.write(filepath, audio_array, sample_rate, format=extension.upper())
         return filepath
 
     def get_unique_filepath(self, filename_template: str) -> Path:
