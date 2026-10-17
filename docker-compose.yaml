@@ -12,8 +12,8 @@ services:
       POSTGRES_PASSWORD: _V01o6y4-G0m35
       POSTGRES_DB: perovskite_dev
     restart: always
-#    healthcheck:
-#      retries: 5
-#      interval: 5ms
-#      timeout: 10ms
-#      test: ["CMD"]
+    healthcheck:
+      retries: 5
+      interval: 5ms
+      timeout: 10ms
+      test: ["CMD"]

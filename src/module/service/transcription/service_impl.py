@@ -38,7 +38,6 @@ class TranscriptionServiceImpl(TranscriptionService):
                     transcription_dto.model_settings
                 )
 
-                print(entity)
             except Exception as exc:
                 raise exc
             

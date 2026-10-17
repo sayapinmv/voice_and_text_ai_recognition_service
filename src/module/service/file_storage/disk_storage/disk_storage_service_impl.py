@@ -25,10 +25,8 @@ class DiskFileStorageServiceImpl(DiskFileStorageService):
         content_stream.seek(0)
 
         with open(filepath, 'w', buffering=self.buffer_size, encoding=encoding.value) as file:
-            seek = self.buffer_size
-            while chunk := content_stream.read(seek):
+            while chunk := content_stream.read(self.buffer_size):
                 file.write(chunk)
-                seek += self.buffer_size
 
         return filepath
 

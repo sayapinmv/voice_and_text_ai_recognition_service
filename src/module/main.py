@@ -12,6 +12,9 @@ from src.module.service.file_storage.disk_storage.disk_storage_service_impl impo
 from src.module.service.recognition.speech_to_text.whisper_service_impl import WhisperServiceImpl
 from src.module.service.recognition.text_to_speech.qwen_tts_service_impl import QwenTTSServiceImpl
 
+from sqlalchemy.orm.session import sessionmaker
+from sqlalchemy import create_engine, select
+
 
 if __name__ == '__main__':
     env_provider = ConfigProviderFactoryImpl.create('env', './.env')
@@ -52,3 +55,11 @@ if __name__ == '__main__':
     app.include_router(transcriptions_controller.router)
 
     uvicorn.run(app, host=config.server.host, port=config.server.port)
+
+    engine = create_engine('connection_url')
+    session = sessionmaker()
+    with session() as session:
+        scalar = select().where()
+
+
+
