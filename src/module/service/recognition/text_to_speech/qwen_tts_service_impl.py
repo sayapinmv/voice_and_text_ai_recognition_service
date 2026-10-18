@@ -1,62 +1,80 @@
-from typing import TextIO
 from typing import Any
 from pathlib import Path
-import torch
 
 from qwen_tts import Qwen3TTSModel
 
-from src.module.entity.transcription_entity import TranscriptionEntity, TranscriptionType
-from src.module.service.file_storage.disk_storage.service import DiskFileStorageService, Encoding
-from src.module.service.recognition.service import RecognitionService
-from src.module.service.file_storage.disk_storage.service import TextFileExtension
+from src.module.entities.file import FileEntity, FileType
+from src.module.entities.transcription import TranscriptionType
+from src.module.service.file_storage.service import FileStorageService, FileDto
+from src.module.service.recognition.service import RecognitionService, RecognitionDto, Config
 from src.module.logger.logger import Logger
+from src.module.service.recognition.text_to_speech.qwen_tts_settings import QwenTTSModelSettings, \
+    QwenTTSTranscriptionSettings
 
-ALLOWED_EXTENSIONS = ', '.join(ext.value for ext in TextFileExtension)
 
 class QwenTTSServiceImpl(RecognitionService):
 
     def __init__(self,
-                 default_settings: dict[str, Any],
-                 origins_storage: DiskFileStorageService,
-                 transcriptions_storage: DiskFileStorageService,
+                 qwen_tts_cfg: Config,
+                 file_service: FileStorageService,
                  logger: Logger):
-        super().__init__(default_settings, origins_storage, transcriptions_storage, logger)
+        super().__init__(file_service, logger)
+        model_settings = QwenTTSModelSettings(**qwen_tts_cfg.model_settings)
+        self._model = self.set_up_model(model_settings)
+        self._default_settings = QwenTTSTranscriptionSettings(**qwen_tts_cfg.default_transcription_settings)
 
-        self._default_settings = default_settings
+    def set_up_model(self, model_settings: QwenTTSModelSettings):
+        try:
+            json_settings = model_settings.model_dump(exclude={'model_path'}, exclude_none=True)
+            model = Qwen3TTSModel.from_pretrained(model_settings.model_path, **json_settings)
+        except Exception as exc:
+            self.logger.error(f"Failed to set up QwenTTS model.\nSettings: {model_settings}\nException: {exc}")
+            raise RuntimeError(f"Failed to set up QwenTTS model.\nSettings: {model_settings}\nException: {exc}")
+        return model
 
-    def create_transcription(self, filename: str, origin_stream: TextIO, model_settings: dict[str, Any] = None) -> TranscriptionEntity:
-        file_extension = filename.split('.')[-1]
+    def merge_settings(self, transcription_settings: dict[str, Any]) -> dict[str, Any]:
+        merged_settings = self._default_settings.model_dump().copy()
 
-        if file_extension not in ALLOWED_EXTENSIONS:
-            self.logger.error(f"Invalid file extension {file_extension}. Should be one of them: {ALLOWED_EXTENSIONS}")
-            raise ValueError(f"Invalid file extension {file_extension}. Should be one of them: {ALLOWED_EXTENSIONS}")
+        for key, val in transcription_settings.items():
+            merged_settings[key] = val
+
+        return merged_settings
+
+    def set_up_transcription_settings(self, transcription_settings: Any):
+        union_settings = self.merge_settings(transcription_settings)
+        try:
+            qwen_tts_settings = QwenTTSTranscriptionSettings.model_validate(union_settings)
+        except Exception as e:
+            self.logger.error(f"Invalid QwenTTS transcription settings: {e}")
+            raise ValueError(f"Invalid QwenTTS transcription settings: {e}")
+
+        return qwen_tts_settings
+
+    def create_transcription(self, recognition_dto: RecognitionDto) -> FileEntity:
+        transcription_settings = self._default_settings
+        if recognition_dto.model_settings is not None:
+            transcription_settings = self.set_up_transcription_settings(recognition_dto.model_settings)
+
+        self.logger.debug(f"QwenTTS transcription settings: {transcription_settings}")
 
         try:
-            model = Qwen3TTSModel.from_pretrained(
-                "./models/qwen-tts",
-                device_map="cpu",
-                dtype=torch.bfloat16,
-                attn_implementation="sdpa",
+            np_arrays, sample_rate = self._model.generate_custom_voice(
+                text=str(recognition_dto.file.read()),
+                **transcription_settings.model_dump(),
             )
-
-            np_arrays, sample_rate = model.generate_custom_voice(
-                text=origin_stream.read(),
-                language=["Russian"],
-                speaker=["Vivian"]
-            )
-
         except Exception as exc:
             raise ValueError(exc)
 
-        # new_origin_filepath = self.origin_storage.create_text_file(filename, origin_stream, Encoding.UTF_8)
-        new_transcription_filename = self.transcriptions_storage.set_new_file_extension(filename, 'wav')
-        new_transcription_filepath = self.transcriptions_storage.create_sound_file(new_transcription_filename, np_arrays[0], sample_rate)
+        original_name = Path(recognition_dto.filename).stem
+        extension = transcription_settings.output_format
+        output_filename = f"{original_name}.{extension}"
 
-        return TranscriptionEntity(
-            transcription_type=TranscriptionType.TEXT_TO_SPEECH,
-            transcription_name=new_transcription_filename,
-            transcription_filepath=new_transcription_filepath,
-            origin_name=filename,
-            origin_filepath=Path('./')
-            # origin_filepath=new_origin_filepath
-        )
+
+        return self.file_service.create_file(FileDto(
+            type=FileType.Media,
+            filepath=Path("outputs") / Path(TranscriptionType.TEXT_TO_SPEECH.value.lower()) / Path(output_filename),
+            file_data=np_arrays[0].tobytes(),
+            meta={
+                'sample_rate': sample_rate,
+            }
+        ))

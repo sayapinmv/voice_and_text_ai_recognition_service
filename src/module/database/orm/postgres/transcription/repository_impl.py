@@ -1,18 +1,36 @@
 from sqlalchemy import select
 
-from src.module.repository.transcription.repository import TranscriptionRepository, TranscriptionType
-from src.module.entity.transcription_entity import TranscriptionEntity
 from src.module.database.orm.postgres.db import PostgresDB
-from src.module.logger.logger import Logger
-from src.module.database.orm.postgres.models.transcription_model import TranscriptionModel
-from src.module.repository.transcription.mapper import to_transcription_model, to_transcription_entity
+from src.module.database.orm.postgres.transcription.model import TranscriptionModel
+from src.module.entities.transcription import TranscriptionType, TranscriptionEntity
+from src.module.repository.transcription import TranscriptionRepository
 
+
+def to_transcription_model(entity: TranscriptionEntity) -> TranscriptionModel:
+    return TranscriptionModel(
+        id=entity.id,
+        type=entity.type,
+        name=entity.name,
+        transcription_file_key=entity.transcription_file_key,
+        origin_file_key=entity.origin_file_key,
+        created_at=entity.created_at,
+    )
+
+
+def to_transcription_entity(model: TranscriptionModel) -> TranscriptionEntity:
+    return TranscriptionEntity(
+        id=model.id,
+        type=model.type,
+        name=model.name,
+        transcription_file_key=model.transcription_file_key,
+        origin_file_key=model.origin_file_key,
+        created_at=model.created_at,
+    )
 
 class TranscriptionRepositoryImpl(TranscriptionRepository):
 
-    def __init__(self, db: PostgresDB, logger: Logger = None):
+    def __init__(self, db: PostgresDB):
         self._db = db
-        self._logger = logger
 
     def get_by_id(self, id: int) -> TranscriptionEntity:
         with self._db.get_session() as session:
@@ -20,11 +38,11 @@ class TranscriptionRepositoryImpl(TranscriptionRepository):
             model = session.scalars(statement).first()
             return to_transcription_entity(model)
 
-    def get_by_name_and_type(self, transcription_name: str, transcription_type: TranscriptionType):
+    def get_by_name_and_type(self, name: str, type: TranscriptionType):
         with self._db.get_session() as session:
             statement = select(TranscriptionModel).where(
-                TranscriptionModel.transcription_name == transcription_name,
-                TranscriptionModel.transcription_type == transcription_type.value
+                TranscriptionModel.name == name,
+                TranscriptionModel.type == type.value
             )
 
             model = session.scalars(statement).first()

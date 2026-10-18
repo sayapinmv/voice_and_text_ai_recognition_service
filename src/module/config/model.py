@@ -4,9 +4,8 @@ from typing import Literal, Any
 
 
 class BaseAIModel(BaseModel):
-    transcriptions_dirpath: str
-    origins_dirpath: str
     model_settings: dict[str, Any]
+    default_transcription_settings: dict[str, Any]
 
 
 class TextToSpeechAIModel(BaseAIModel):

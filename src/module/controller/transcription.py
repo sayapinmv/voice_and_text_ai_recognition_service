@@ -2,14 +2,11 @@ import json
 from typing import Optional
 
 from fastapi.responses import FileResponse, Response, JSONResponse
-from fastapi import APIRouter, UploadFile, Form, File, status
+from fastapi import APIRouter, UploadFile, Form, File, status, HTTPException
 
 from src.module.logger.logger import Logger
-from src.module.service.transcription.service import TranscriptionService
-from src.module.entity.transcription_entity import TranscriptionType
-from src.module.controller.models import GetTranscriptionResponse
-from src.module.service.transcription.model import TranscriptionDto
-
+from src.module.service.transcription.service import TranscriptionService, TranscriptionDto
+from src.module.entities.transcription import TranscriptionType
 
 class TranscriptionsController:
     def __init__(self,
@@ -37,49 +34,42 @@ class TranscriptionsController:
     async def _get(self, id: int):
         self._logger.info(f"Getting transcription {id}")
         entity = self._transcription_service.get(id)
-        response = GetTranscriptionResponse(
-            id=entity.id,
-            transcription_type=entity.transcription_type,
-            transcription_name=entity.transcription_name,
-            origin_name=entity.origin_name
-        )
-
-        return JSONResponse(response.model_dump_json())
-
-    async def _get_transcription_file(self, id: int):
-        entity = self._transcription_service.get(id)
-        print(entity.transcription_filepath)
-        return FileResponse(entity.transcription_filepath, status_code=status.HTTP_200_OK)
+        return JSONResponse(entity.model_dump_json())
 
     async def _get_origin_file(self, id: int):
-        entity = self._transcription_service.get(id)
-        print(entity.origin_filepath)
-        return FileResponse(entity.origin_filepath, status_code=status.HTTP_200_OK)
+        origin_file = self._transcription_service.get_origin_filepath(id)
+        self._logger.info(f"Transcription origin filepath: {origin_file.filepath}")
+        return FileResponse(origin_file.filepath, filename=origin_file.filename, status_code=status.HTTP_200_OK)
+
+    async def _get_transcription_file(self, id: int):
+        transcription_file = self._transcription_service.get_transcription_filepath(id)
+        self._logger.info(f"Transcription filepath: {transcription_file.filepath}")
+        return FileResponse(transcription_file.filepath, filename=transcription_file.filename, status_code=status.HTTP_200_OK)
 
     async def _create(self,
-                      transcription_type: str = Form(str),
-                      model_settings: Optional[str] = Form('{}'),
+                      type: str = Form(str),
+                      transcription_settings: Optional[str] = Form('{}'),
                       origin_file: UploadFile = File(None)):
 
         try:
-            trans_type = TranscriptionType(transcription_type)
+            trans_type = TranscriptionType(type)
         except ValueError:
-            raise ValueError(f"Invalid transcription type '{transcription_type}'")
+            raise HTTPException(detail=json.dumps({"err_msg":f"Invalid transcription type '{type}'"}, status_code=status.HTTP_400_BAD_REQUEST))
 
         json_model_settings = {}
 
-        if model_settings is not None:
+        if transcription_settings is not None:
             try:
-                json_model_settings = json.loads(model_settings)
+                json_model_settings = json.loads(transcription_settings)
             except Exception as exc:
-                raise ValueError(
-                    f"Invalid model settings json format: model_settings: {model_settings}, exception: {exc}")
+                raise HTTPException(detail=json.dumps({f"Invalid model settings json format: model_settings: {transcription_settings}, exception: {exc}"},
+                                                      status_code=status.HTTP_400_BAD_REQUEST))
 
         transcription_dto = TranscriptionDto(
             model_settings=json_model_settings,
             filename=str(origin_file.filename),
-            transcription_type=trans_type,
-            file_stream=origin_file.file
+            type=trans_type,
+            file=origin_file.file
         )
 
         try:
@@ -87,7 +77,7 @@ class TranscriptionsController:
         except Exception as exc:
             raise exc
 
-        return FileResponse(entity.transcription_filepath)
+        return JSONResponse(entity.model_dump_json())
 
     async def _remove(self, id):
         self._transcription_service.remove(id)

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from src.module.entity.transcription_entity import TranscriptionEntity, TranscriptionType
+from src.module.entities.transcription import TranscriptionEntity, TranscriptionType
 
 
 class TranscriptionRepository(ABC):

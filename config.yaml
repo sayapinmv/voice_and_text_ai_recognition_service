@@ -1,31 +1,83 @@
 ai_models:
   speech_to_text:
-    transcriptions_dirpath: ./outputs/speech_to_text
-    origins_dirpath: ./inputs/media
+    # Настройки модели Whisper
     model_settings:
-      name: base
-      device: 'cpu'
-      in_memory: true
-      language: 'ru'  # string: "ru", "en", "fr" и т.д. или null для автоопределения
-      task: "transcribe"  # string: "transcribe" или "translate"
+      # tiny, tiny.en, base, base.en, small, small.en,
+      # medium, medium.en, large, large-v1, large-v2,
+      # large-v3, large-v3-turbo, turbo
+      name: small
 
-      # Параметры семплинга
-      temperature: 0.0  # float или список
+      # cpu или cuda
+      device: cpu
 
-      # Пороговые значения для отбраковки
-      compression_ratio_threshold: 2.4  # float или null
-      logprob_threshold: -1.0  # float или null
-      no_speech_threshold: 0.6  # float или null
+      # Удерживать модель в памяти
+      in_memory: false
 
-      # Дополнительные параметры
-      condition_on_previous_text: true  # boolean
-      initial_prompt: null  # string или null
-      word_timestamps: false  # boolean
-      verbose: false  # boolean
-      fp16: true  # boolean
+    # Настройки транскрибации
+    default_transcription_settings:
+      # Язык аудио; null для автоопределения
+      language: ru
 
-#  text_to_speech:
-#    model_name:
+      # transcribe — распознавание
+      # translate — перевод на английский
+      task: transcribe
+
+      # Температура: число от 0 до 1 или список значений
+      temperature: 0.2
+
+      # Пороги фильтрации результата
+      compression_ratio_threshold: 2.4
+      logprob_threshold: -1.0
+      no_speech_threshold: 0.7
+
+      # Контекст
+      condition_on_previous_text: true
+      initial_prompt: null
+
+      # Временные метки
+      word_timestamps: false
+      without_timestamps: false
+      hallucination_silence_threshold: null
+
+      # Вывод и вычисления
+      verbose: false
+      fp16: false
+
+      # Параметры декодирования
+      beam_size: 5
+      best_of: 5
+      patience: null
+      length_penalty: null
+
+      # Формат файла результата: txt, srt, vtt, json
+      output_format: txt
+
+
+  text_to_speech:
+    model_settings:
+      model_path: "./models/qwen-tts"
+      device_map: "cpu"                    # cpu | cuda:0 | auto
+      dtype: "bfloat16"                # bfloat16 | float16 | float32
+      attn_implementation: "sdpa"      # sdpa | flash_attention_2
+
+    # ============================================
+    # Qwen TTS — настройки генерации по умолчанию
+    # Используются, если в запросе не передан model_settings.
+    # Можно переопределять на каждый запрос.
+    # ============================================
+    default_transcription_settings:
+      speaker: "Vivian"
+      language: "Russian"
+      instruct: null                   # только для моделей 1.7B
+      output_format: "wav"
+
+      # Параметры сэмплирования (передаются в generate_custom_voice)
+      do_sample: true
+      temperature: 0.85
+      top_k: 50
+      top_p: 0.95
+      repetition_penalty: 1.05
+      max_new_tokens: 600
 
 server:
   host: localhost

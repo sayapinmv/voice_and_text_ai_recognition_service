@@ -1,4 +1,4 @@
-from src.module.database.orm.postgres.models.base_model import BasePostgresModel
+from src.module.database.orm.postgres.base_model import BasePostgresModel
 from sqlalchemy.orm.session import sessionmaker
 from sqlalchemy import create_engine
 

@@ -1,23 +1,36 @@
 from abc import abstractmethod, ABC
-from typing import Any, IO
+from dataclasses import dataclass
+from typing import Any, BinaryIO
 
-from src.module.service.file_storage.disk_storage.service import DiskFileStorageService
-from src.module.entity.transcription_entity import TranscriptionEntity
+from src.module.entities.file import FileEntity
 from src.module.logger.logger import Logger
+from src.module.service.file_storage.service_impl import FileStorageService
 
+@dataclass
+class Config:
+    model_settings: dict[str, Any]
+    default_transcription_settings: dict[str, Any]
+
+@dataclass
+class RecognitionDto:
+    filename: str
+    file: BinaryIO
+    model_settings: dict[str, Any] = None
 
 class RecognitionService(ABC):
 
     def __init__(self,
-                 default_settings: dict[str, Any],
-                 origin_storage: DiskFileStorageService,
-                 transcriptions_storage: DiskFileStorageService,
+                 file_service: FileStorageService,
                  logger: Logger):
 
-        self.default_settings = default_settings
-        self.origin_storage = origin_storage
-        self.transcriptions_storage = transcriptions_storage
+        self.file_service = file_service
         self.logger = logger
 
     @abstractmethod
-    def create_transcription(self, filename: str, file: IO, model_settings: dict[str, Any] = None) -> TranscriptionEntity: pass
+    def set_up_model(self, settings: Any): pass
+
+    @abstractmethod
+    def set_up_transcription_settings(self, model_settings: Any): pass
+
+    @abstractmethod
+    def create_transcription(self, recognition_dto: RecognitionDto) -> FileEntity: pass

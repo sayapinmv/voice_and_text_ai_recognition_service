@@ -1,22 +1,29 @@
-import os
+from pathlib import Path
 
+from src.module.entities.file import FileType
 from src.module.logger.logger import Logger
-from src.module.entity.transcription_entity import TranscriptionType, TranscriptionEntity
-from src.module.repository.transcription.repository import TranscriptionRepository
-from src.module.service.transcription.service import TranscriptionService
-from src.module.service.transcription.model import TranscriptionDto
-from src.module.service.recognition.service import RecognitionService
+from src.module.entities.transcription import TranscriptionType, TranscriptionEntity
+from src.module.repository.transcription import TranscriptionRepository
+
+from src.module.service.file_storage.service import FileStorageService, FileDto
+from src.module.service.transcription.service import TranscriptionService, TranscriptionDto
+from src.module.service.recognition.service import RecognitionService, RecognitionDto
+
+FILE_TYPE_BY_TRANSCRIPTION_TYPE = {
+    TranscriptionType.SPEECH_TO_TEXT : FileType.Media,
+    TranscriptionType.TEXT_TO_SPEECH: FileType.Text,
+}
 
 
 class TranscriptionServiceImpl(TranscriptionService):
 
     def __init__(self,
-                 speech_to_text_service: RecognitionService,
-                 text_to_speech_service: RecognitionService,
+                 recognition_services: dict[TranscriptionType, RecognitionService],
                  transcription_repo: TranscriptionRepository,
+                 file_service: FileStorageService,
                  logger: Logger):
 
-        super().__init__(speech_to_text_service, text_to_speech_service, transcription_repo, logger)
+        super().__init__(recognition_services, transcription_repo, file_service, logger)
 
     def get(self, id: int):
         try:
@@ -30,55 +37,71 @@ class TranscriptionServiceImpl(TranscriptionService):
     def create(self, transcription_dto: TranscriptionDto) -> TranscriptionEntity:
         self.logger.info("Start creating transcription")
 
-        if transcription_dto.transcription_type is TranscriptionType.TEXT_TO_SPEECH:
-            try:
-                entity = self.text_to_speech_service.create_transcription(
-                    transcription_dto.filename,
-                    transcription_dto.file_stream,
-                    transcription_dto.model_settings
-                )
+        if transcription_dto.type not in self.recognition_services:
+            raise ValueError('Invalid transcription type')
 
-            except Exception as exc:
-                raise exc
-            
-        elif transcription_dto.transcription_type is TranscriptionType.SPEECH_TO_TEXT:
-            try:
-                entity = self.speech_to_text_service.create_transcription(
-                    transcription_dto.filename,
-                    transcription_dto.file_stream,
-                    transcription_dto.model_settings
-                )
-
-                print(entity)
-            except Exception as exc:
-                raise exc
-
-        self.logger.debug("Transcription file successfully created.")
+        original_file = None
+        transcription_file = None
 
         try:
-            new_entity = self.transcription_repo.create(entity)
-        except Exception:
-            log_msg = f"Failed creating transcription record by name {transcription_dto.filename}"
-            self.logger.error(log_msg)
-            raise RuntimeError(log_msg)
+            origin_file_data = transcription_dto.file.read()
+            transcription_dto.file.seek(0)
+
+            origin_file = FileDto(
+                type=FILE_TYPE_BY_TRANSCRIPTION_TYPE[transcription_dto.type],
+                filepath=Path("inputs") / Path(transcription_dto.type.value.lower()) / Path(transcription_dto.filename).name,
+                file_data=origin_file_data,
+            )
+            original_file = self.file_service.create_file(origin_file)
+
+            recognition_service = self.recognition_services[transcription_dto.type]
+            recognition_dto = RecognitionDto(
+                filename=transcription_dto.filename,
+                file=transcription_dto.file,
+                model_settings=transcription_dto.model_settings,
+            )
+
+            transcription_file = recognition_service.create_transcription(recognition_dto)
+            self.logger.debug("Transcription file successfully created.")
+
+            entity = TranscriptionEntity(
+                type=transcription_dto.type,
+                name=Path(transcription_dto.filename).stem,
+                transcription_file_key=transcription_file.file_key,
+                origin_file_key=original_file.file_key
+            )
+
+            entity = self.transcription_repo.create(entity)
+
+        except Exception as exc:
+            for file_entity in (transcription_file, original_file):
+                if file_entity is not None:
+                    try:
+                        self.file_service.remove(file_entity.file_key)
+                    except Exception as cleanup_exc:
+                        self.logger.error(
+                            f"Failed to clean up file "
+                            f"{file_entity.file_key}: {cleanup_exc}"
+                        )
+
+            self.logger.error(f"Failed creating transcription: {exc}")
+            raise RuntimeError("Failed to create transcription") from exc
 
         self.logger.info("Transcription successfully created")
-        return new_entity
+        return entity
 
     def remove(self, id: int):
-        entity = self.transcription_repo.get_by_id(id)
+        try:
+            entity = self.transcription_repo.get_by_id(id)
+        except Exception as exc:
+            self.logger.error(f'Failed to get transcription entity for removing: {exc}')
+            raise RuntimeError('Failed to get transcription for removing') from exc
 
-        if os.path.exists(entity.transcription_filepath):
-            os.remove(entity.transcription_filepath)
-            self.logger.debug(f"Transcription file by id {id} successfully deleted.")
-        else:
-            self.logger.warning(f'Transcription file for entity by id {id} already deleted.')
-
-        if os.path.exists(entity.origin_filepath):
-            os.remove(entity.origin_filepath)
-            self.logger.debug(f"Origin file by id {id} successfully deleted.")
-        else:
-            self.logger.warning(f'Origin file for entity by id {id} already deleted.')
+        try:
+            self.file_service.remove_by_keys(entity.transcription_file_key, entity.origin_file_key)
+        except Exception as exc:
+            self.logger.error(f'Failed removing transcription file entities: {exc}')
+            raise RuntimeError('Failed removing transcription file entities') from exc
 
         try:
             self.transcription_repo.remove_by_id(id)
